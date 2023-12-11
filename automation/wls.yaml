@@ -1,0 +1,108 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wls-config
+data:
+  SPRING_APPLICATION_JSON: |
+    {
+      "spring": {
+        "application": {
+          "name": "Kind Demo"
+        },
+        "datasource": {
+          "hikari": {
+            "data-source-properties": {
+              "additionalEndpoints": "yb-tserver-1.yb-tservers:5433,yb-tserver-2.yb-tservers:5433",
+              "databaseName": "yugabyte",
+              "serverName": "yb-tserver-0.yb-tservers",
+              "topologyKeys": "kubernetes.local.*"
+            },
+            "password": "",
+            "username": "yugabyte"
+          }
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: wls
+  name: wls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wls
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: wls
+    spec:
+      containers:
+        - image: ghcr.io/yogendra/yb-workload-simu-app:latest
+          name: wls
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: 500m
+              memory: 2Gi
+          envFrom:
+            - configMapRef:
+                name: wls-config
+                optional: true
+          ports:
+            - containerPort: 8080
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wls
+spec:
+  selector:
+    app: wls
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: http
+      name: http
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: wls
+# spec:
+#   selector:
+#     app: wls
+#   type: ClusterIP
+#   ports:
+#     - port: 80
+#       targetPort: http
+#       name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wls
+spec:
+  rules:
+  - host: "*"
+    http:
+      paths:
+      - backend:
+          service:
+            name: wls
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
