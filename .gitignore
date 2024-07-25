@@ -13,3 +13,5 @@ target
 *.iml
 .idea/
 .vscode
+app.log
+yb-base/
