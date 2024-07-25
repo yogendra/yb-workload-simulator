@@ -13,7 +13,5 @@ target
 *.iml
 .idea/
 .vscode
-.terraform
-*.tfstate
-*.tfstate.backup
-*.tfvars
+app.log
+yb-base/
