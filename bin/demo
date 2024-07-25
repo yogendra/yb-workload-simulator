@@ -6,7 +6,7 @@ SCRIPT=$0
 JAR=$PROJECT_DIR/target/yb-workload-sim.jar
 RF=3
 YB_BASE=$PROJECT_DIR/yb-base
-
+export SPRING_APPLICATION_NAME="Live Demo"
 function app(){
   OP=${1:-start}; shift
   app-$OP "$@"
