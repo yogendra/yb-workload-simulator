@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+PROJECT_DIR=$(cd $SCRIPT_DIR/..; pwd)
+SCRIPT=$0
+JAR=$PROJECT_DIR/target/yb-workload-sim.jar
+RF=3
+YB_BASE=$PROJECT_DIR/yb-base
+
+function app(){
+  OP=${1:-start}; shift
+  app-$OP "$@"
+}
+function cluster(){
+  OP=${1:-start}; shift
+  cluster-$OP "$@"
+}
+
+function node(){
+  OP=${1:-start}; shift
+  node-$OP "$@"
+}
+
+function start(){
+  echo Demo start
+  stop
+  cluster start
+  app start
+}
+function stop(){
+  echo Demo stop
+  app stop
+  cluster stop
+}
+
+function status(){
+
+  cat<<EOF
+APP: http://127.0.0.1:8080/
+
+`yugabyted status --base_dir $YB_BASE/n1`
+EOF
+
+}
+
+
+function cluster-start(){
+  echo CLUSTER start
+  for i in 1 2 3
+  do
+    node start $i
+  done
+}
+
+
+function cluster-stop(){
+  echo CLUSTER stop
+  for i in 1 2 3 4 5 6
+  do
+    node destroy $i
+  done
+}
+
+function node-stop(){
+  echo NODE stop
+  i=$1
+  base_dir=$YB_BASE/n$i
+  yugabyted stop --base_dir $base_dir
+}
+function node-destroy(){
+  echo NODE destroy
+  i=$1
+  base_dir=$YB_BASE/n$i
+  yugabyted destroy --base_dir $base_dir
+}
+function node-start(){
+  echo NODE start
+  i=$1
+  base_dir=$YB_BASE/n$i
+  iface=127.0.0.$i
+  sudo ifconfig lo0 alias  127.0.0.$i
+  master_flags="tserver_unresponsive_timeout_ms=2000"
+  other_args=""
+  if [[ $i != 1 ]]; then
+    other_args="--join 127.0.0.1 --ui=false"
+  fi
+  zone_id=$(( ($i % $RF) + 1 ))
+  yugabyted start \
+    --base_dir $base_dir \
+    --cloud_location 'mac.local.zone'$zone_id \
+    --advertise_address $iface  \
+    --master_flags="$master_flags" \
+    $other_args
+}
+
+function app-start(){
+  echo APP start
+  nohup java -jar $JAR &> $PROJECT_DIR/app.log &
+}
+
+function app-stop(){
+  echo APP stop
+  ps -eaf | grep "java -jar $JAR" | grep -v grep | awk '{print $2}' | while read pid
+  do
+    echo stop java $pid
+    kill -9 $pid
+  done || echo
+  echo app stopped
+}
+function app-logs(){
+  tail -f $PROJECT_DIR/app.log
+}
+
+
+
+OP=${1:-status}; shift
+$OP "$@"
