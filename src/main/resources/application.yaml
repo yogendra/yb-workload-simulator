@@ -39,8 +39,8 @@ logging.level:
   com.zaxxer.hikari: TRACE
   com.yugabyte: ERROR
   com.yugabyte.simulation.workload: ERROR
-  org.springframework.jdbc.core: ERROR 
-    
+  org.springframework.jdbc.core: ERROR
+
 server:
   port: 8080
 
@@ -51,3 +51,12 @@ ybm:
   cluster-id: ${ybm-cluster-id:NA}
   baseuri: ${ybm-baseuri:https://cloud.yugabyte.com/api/public/v1/accounts}
   pulltopologyfromapi: ${pulltopologyfromapi:false}
+management:
+  endpoints:
+    enabled-by-default: true
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      show-details: always
