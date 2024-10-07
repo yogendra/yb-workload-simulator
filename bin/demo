@@ -27,6 +27,7 @@ function start(){
   cluster start
   app start
 }
+
 function stop(){
   echo Demo stop
   app stop
@@ -61,40 +62,86 @@ function cluster-stop(){
   done
 }
 
+function node-add(){
+  node start $1
+}
+
+function node-remove(){
+  node stop $1
+}
+
+function node-del(){
+  node stop $1
+}
+
 function node-stop(){
-  echo NODE stop
-  i=$1
+  i=${1:?"Node number missing"}
+  if [[ $(($i)) -lt 1 ]]
+  then
+    echo "Index must be >= 1"
+    exit 1
+  fi
+  echo "NODE (node-$i) stop"
   base_dir=$YB_BASE/n$i
   yugabyted stop --base_dir $base_dir
 }
+
 function node-destroy(){
-  echo NODE destroy
-  i=$1
+  i=${1:?"Node number missing"}
+  if [[ $(($i)) -lt 1 ]]
+  then
+    echo "Index must be >= 1"
+    exit 1
+  fi
+  echo "NODE (node-$i) destroy"
   base_dir=$YB_BASE/n$i
   yugabyted destroy --base_dir $base_dir
 }
+
+regions=(singapore jakarta manila)
+zones=(dc1 dc2 dc3)
+
 function node-start(){
-  echo NODE start
-  i=$1
+  i=${1:?"Node number missing"}
+  if [[ $(($i)) -lt 1 ]]
+  then
+    echo "Index must be >= 1"
+    exit 1
+  fi
+
   base_dir=$YB_BASE/n$i
   iface=127.0.0.$i
-  sudo ifconfig lo0 alias  127.0.0.$i
-  master_flags="tserver_unresponsive_timeout_ms=2000"
+  if ! ip a show lo0 | grep $iface/8 &> /dev/null
+  then
+    echo Create interface $iface
+    sudo ifconfig lo0 alias $iface &> /dev/null
+  fi
+
+  master_flags="flagfile=$PROJECT_DIR/master.gflags"
+  tserver_flags="flagfile=$PROJECT_DIR/tserver.gflags"
+
   other_args=""
+  im3=0
   if [[ $i != 1 ]]; then
     other_args="--join 127.0.0.1 --ui=false"
   fi
-  zone_id=$(( ($i % $RF) + 1 ))
+  index=$(($i - 1))
+  im3=$(expr $index % 3) || im3=0
+  region=${regions[$im3]}
+  zone=${zones[$im3]}
+  echo Start Node [$region/$zone/node-$i]
   yugabyted start \
     --base_dir $base_dir \
-    --cloud_location 'mac.local.zone'$zone_id \
+    --enable_pg_parity_tech_preview  \
+    --cloud_location "demo.$region.$zone" \
     --advertise_address $iface  \
     --master_flags="$master_flags" \
+    --tserver_flags="$tserver_flags" \
     $other_args
 }
 
 function app-start(){
-  echo APP start
+  echo APP start \(http://127.0.0.1:8080\)
   nohup java -jar $JAR &> $PROJECT_DIR/app.log &
 }
 
@@ -107,11 +154,10 @@ function app-stop(){
   done || echo
   echo app stopped
 }
+
 function app-logs(){
   tail -f $PROJECT_DIR/app.log
 }
-
-
 
 OP=${1:-status}; shift
 $OP "$@"
