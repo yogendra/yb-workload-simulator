@@ -1,0 +1,140 @@
+name: ybwsl
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: demo.Dockerfile
+    # container_name: app
+    hostname: app.local
+    environment:
+        SPRING_DATASOURCE_HIKARI_DATA_SOURCE_PROPERTIES_SERVERNAME: yugabyted-1.local
+        node_c: yugabyted-1.local
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: "curl --fail --silent localhost:8080/actuator/health | grep UP || exit 1"
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+      start_interval: 1s
+    depends_on:
+      yugabyted-1:
+        condition: service_healthy
+      yugabyted-2:
+        condition: service_healthy
+      yugabyted-3:
+        condition: service_healthy
+    networks:
+      demo-net:
+  yugabyted-1:
+    image: yugabytedb/yugabyte:${YB_VERSION}
+    hostname: yugabyted-1.local
+    # container_name: yugabyted-1
+    command:
+    - bash
+    - -c
+    - |
+      rm -rf /tmp/.yb*
+      yugabyted start --daemon false --enable_pg_parity_tech_preview --fault_tolerance=zone  --insecure --cloud_location=docker.local.zone1 --ui=true --advertise_address yugabyted-1.local
+      "
+    volumes:
+      - ./yugabyte/scripts:/home/yugabyte/scripts
+    ports:
+      - "7000:7000"
+      - "9000:9000"
+      - "5433:5433"
+      - "15433:15433"
+    restart: unless-stopped
+    healthcheck:
+      test: ./postgres/bin/pg_isready -U yugabyte -d yugabyte -h yugabyted-1.local
+      interval: 10s
+      start_period: 120s
+      start_interval: 1s
+      retries: 5
+    networks:
+      demo-net:
+        ipv4_address: 10.5.0.11
+  yugabyted-2:
+    image: yugabytedb/yugabyte:${YB_VERSION}
+    hostname: yugabyted-2.local
+    command:
+    - bash
+    - -c
+    - |
+      rm -rf /tmp/.yb*
+      yugabyted start --daemon false --enable_pg_parity_tech_preview --fault_tolerance=zone  --insecure --cloud_location=docker.local.zone2 --ui=false  --advertise_address yugabyted-2.local --join yugabyted-1.local
+    volumes:
+      - ./yugabyte/scripts:/home/yugabyte/scripts
+    restart: unless-stopped
+    healthcheck:
+      test: ./postgres/bin/pg_isready -U yugabyte -d yugabyte -h yugabyted-2.local
+      interval: 10s
+      start_period: 120s
+      start_interval: 1s
+      retries: 5
+    networks:
+      demo-net:
+        ipv4_address: 10.5.0.12
+    depends_on:
+      yugabyted-1:
+        condition: service_healthy
+  yugabyted-3:
+    image: yugabytedb/yugabyte:${YB_VERSION}
+    hostname: yugabyted-3.local
+    command:
+    - bash
+    - -c
+    - |
+      rm -rf /tmp/.yb*
+      yugabyted start --daemon false --enable_pg_parity_tech_preview --fault_tolerance=zone  --insecure --cloud_location=docker.local.zone3 --ui=false  --advertise_address yugabyted-3.local --join yugabyted-1.local
+    volumes:
+      - ./yugabyte/scripts:/home/yugabyte/scripts
+    restart: unless-stopped
+    healthcheck:
+      test: ./postgres/bin/pg_isready -U yugabyte -d yugabyte -h yugabyted-3.local
+      interval: 10s
+      start_period: 120s
+      start_interval: 1s
+      retries: 5
+    networks:
+      demo-net:
+        ipv4_address: 10.5.0.13
+    depends_on:
+      yugabyted-1:
+        condition: service_healthy
+  grafana:
+    build:
+      context: .
+      dockerfile: grafana.Dockerfile
+    hostname: grafana.local
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    networks:
+      demo-net:
+  prometheus:
+    build:
+      context: .
+      dockerfile: prometheus.Dockerfile
+    hostname: prometheus.local
+    ports:
+      - 9090:9090
+    networks:
+      demo-net:
+  shell:
+    # container_name: shell
+    hostname: shell.local
+    image: yugabytedb/yugabyte:${YB_VERSION}
+    command: tail -f /dev/null
+    networks:
+      demo-net:
+networks:
+  demo-net:
+      driver: bridge
+      ipam:
+        config:
+          - subnet: 10.5.0.0/16
+            gateway: 10.5.0.1
+
