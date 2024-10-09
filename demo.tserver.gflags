@@ -1,7 +1,6 @@
 --enable_deadlock_detection=true
 --enable_wait_queues=true
 --follower_unavailable_considered_failed_sec=10
---follower_unavailable_considered_failed_sec=10
 --yb_enable_read_committed_isolation=true
 --ysql_beta_features=true
 --ysql_enable_packed_row=true
