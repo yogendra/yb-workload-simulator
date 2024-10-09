@@ -1,1 +1,3 @@
 --tserver_unresponsive_timeout_ms=3000
+--ysql_enable_packed_row=true
+--ysql_beta_features=true
