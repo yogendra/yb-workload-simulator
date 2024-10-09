@@ -1,21 +1,26 @@
-version: "3.9"
+name: yb-wls-demo
+
 networks:
   ybnet:
+      ipam:
+        config:
+          - subnet: 10.5.0.0/16
+            gateway: 10.5.0.1
 volumes:
-  yugabyted-0:
   yugabyted-1:
   yugabyted-2:
+  yugabyted-3:
 
 services:
-  yugabyted-0:
-    image: yugabytedb/yugabyte:2.18.0.1-b4
-    platform: linux/amd64
+  yugabyted-1:
+    image: yugabytedb/yugabyte:2.23.0.0-b710
     networks:
-      - ybnet
+      ybnet:
+        ipv4_address: 10.5.0.11
     cap_add:
       - NET_ADMIN
-    container_name: yugabyted-0
-    hostname: yugabyted-0.local
+    container_name: yugabyted-1
+    hostname: yugabyted-1.local
     restart: unless-stopped
     ports:
       - "7000:7000"
@@ -24,39 +29,9 @@ services:
       - "5433:5433"
       - "9042:9042"
     volumes:
-      - yugabyted-0:/home/yugabyte/yb-data
-    command:
-      - bash
-      - -c
-      - |
-        rm -rf /tmp/.yb* ;
-        bin/yugabyted start \
-          --insecure \
-          --base_dir=/home/yugabyte/yb-data \
-          --advertise_address=yugabyted-0.local \
-          --cloud_location=cloud.region.zone1 \
-          --fault_tolerance=zone \
-          --tserver_flags="ysql_enable_packed_row=true,ysql_beta_features=true,yb_enable_read_committed_isolation=true,enable_deadlock_detection=true,enable_wait_queues=true,follower_unavailable_considered_failed_sec=10" \
-          --master_flags="ysql_enable_packed_row=true,ysql_beta_features=true" \
-          --daemon=false
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://yugabyted-0.local:15433"]
-      start_period: 5s
-      interval: 10s
-      timeout: 5s
-      retries: 3
-  yugabyted-1:
-    image: yugabytedb/yugabyte:2.18.0.1-b4
-    platform: linux/amd64
-    networks:
-      - ybnet
-    cap_add:
-      - NET_ADMIN
-    container_name: yugabyted-1
-    hostname: yugabyted-1.local
-    restart: unless-stopped
-    volumes:
       - yugabyted-1:/home/yugabyte/yb-data
+      - ./demo.master.gflags:/home/yugabyte/demo.master.gflags
+      - ./demo.tserver.gflags:/home/yugabyte/demo.tserver.gflags
     command:
       - bash
       - -c
@@ -66,27 +41,23 @@ services:
           --insecure \
           --base_dir=/home/yugabyte/yb-data \
           --advertise_address=yugabyted-1.local \
-          --cloud_location=cloud.region.zone1 \
+          --cloud_location=local.docker.zone1 \
           --fault_tolerance=zone \
-          --tserver_flags="ysql_enable_packed_row=true,ysql_beta_features=true,yb_enable_read_committed_isolation=true,enable_deadlock_detection=true,enable_wait_queues=true,follower_unavailable_considered_failed_sec=10" \
-          --master_flags="ysql_enable_packed_row=true,ysql_beta_features=true" \
-          --daemon=false \
-          --ui=false \
-          --join=yugabyted-0.local
+          --master_flags="flagfile=/home/yugabyte/demo.master.gflags" \
+          --tserver_flags="flagfile=/home/yugabyte/demo.tserver.gflags" \
+          --daemon=false
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://yugabyted-1.local:7000"]
-      start_period: 5s
+      test: ./postgres/bin/pg_isready -U yugabyte -d yugabyte -h yugabyted-1.local
+      start_period: 120s
+      start_interval: 1s
       interval: 10s
       timeout: 5s
       retries: 3
-    depends_on:
-      yugabyted-0:
-        condition: service_healthy
   yugabyted-2:
-    image: yugabytedb/yugabyte:2.18.0.1-b4
-    platform: linux/amd64
+    image: yugabytedb/yugabyte:2.23.0.0-b710
     networks:
-      - ybnet
+      ybnet:
+        ipv4_address: 10.5.0.21
     cap_add:
       - NET_ADMIN
     container_name: yugabyted-2
@@ -94,6 +65,9 @@ services:
     restart: unless-stopped
     volumes:
       - yugabyted-2:/home/yugabyte/yb-data
+      - ./demo.master.gflags:/home/yugabyte/demo.master.gflags
+      - ./demo.tserver.gflags:/home/yugabyte/demo.tserver.gflags
+
     command:
       - bash
       - -c
@@ -103,39 +77,107 @@ services:
           --insecure \
           --base_dir=/home/yugabyte/yb-data \
           --advertise_address=yugabyted-2.local \
-          --cloud_location=cloud.region.zone1 \
+          --cloud_location=local.docker.zone2 \
           --fault_tolerance=zone \
-          --tserver_flags="ysql_enable_packed_row=true,ysql_beta_features=true,yb_enable_read_committed_isolation=true,enable_deadlock_detection=true,enable_wait_queues=true,follower_unavailable_considered_failed_sec=10" \
-          --master_flags="ysql_enable_packed_row=true,ysql_beta_features=true" \
+          --master_flags="flagfile=/home/yugabyte/demo.master.gflags" \
+          --tserver_flags="flagfile=/home/yugabyte/demo.tserver.gflags" \
           --daemon=false \
           --ui=false \
           --join=yugabyted-1.local
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://yugabyted-2.local:7000"]
-      start_period: 5s
+      test: ./postgres/bin/pg_isready -U yugabyte -d yugabyte -h yugabyted-2.local
+      start_period: 120s
+      start_interval: 1s
       interval: 10s
       timeout: 5s
       retries: 3
     depends_on:
       yugabyted-1:
         condition: service_healthy
+  yugabyted-3:
+    image: yugabytedb/yugabyte:2.23.0.0-b710
+    networks:
+      ybnet:
+        ipv4_address: 10.5.0.31
+    cap_add:
+      - NET_ADMIN
+    container_name: yugabyted-3
+    hostname: yugabyted-3.local
+    restart: unless-stopped
+    volumes:
+      - yugabyted-3:/home/yugabyte/yb-data
+      - ./demo.master.gflags:/home/yugabyte/demo.master.gflags
+      - ./demo.tserver.gflags:/home/yugabyte/demo.tserver.gflags
+    command:
+      - bash
+      - -c
+      - |
+        rm -rf /tmp/.yb* ;
+        bin/yugabyted start \
+          --insecure \
+          --base_dir=/home/yugabyte/yb-data \
+          --advertise_address=yugabyted-3.local \
+          --cloud_location=local.docker.zone3 \
+          --fault_tolerance=zone \
+          --master_flags="flagfile=/home/yugabyte/demo.master.gflags" \
+          --tserver_flags="flagfile=/home/yugabyte/demo.tserver.gflags" \
+          --daemon=false \
+          --ui=false \
+          --join=yugabyted-2.local
+    healthcheck:
+      test: ./postgres/bin/pg_isready -U yugabyte -d yugabyte -h yugabyted-3.local
+      start_period: 120s
+      start_interval: 1s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      yugabyted-2:
+        condition: service_healthy
+  shell:
+    # container_name: shell
+    hostname: shell.local
+    image: yugabytedb/yugabyte:2.23.0.0-b710
+    command: tail -f /dev/null
+    networks:
+      ybnet:
   app:
     build:
       context: .
       dockerfile: demo.Dockerfile
     container_name: app
     networks:
-      - ybnet
+      ybnet:
     hostname: app.local
     environment:
-        SPRING_DATASOURCE_HIKARI_DATA_SOURCE_PROPERTIES_SERVERNAME: yugabyted-0.local
+        SPRING_DATASOURCE_HIKARI_DATA_SOURCE_PROPERTIES_SERVERNAME: yugabyted-1.local
+        node_c: yugabyted-1.local
     restart: unless-stopped
     ports:
       - "8080:8080"
     depends_on:
-      yugabyted-0:
-        condition: service_healthy
       yugabyted-1:
         condition: service_healthy
       yugabyted-2:
+        condition: service_healthy
+      yugabyted-3:
+        condition: service_healthy
+  sqlpad:
+    image: sqlpad/sqlpad:6.11.2
+    hostname: sqlpad.local
+    container_name: sqlpad
+    ports:
+      - 3001:3000
+    networks:
+      ybnet:
+    volumes:
+      - ./sqlpad/seed-data:/etc/sqlpad/seed-data
+    environment:
+      SQLPAD_ADMIN: 'admin'
+      SQLPAD_ADMIN_PASSWORD: 'admin'
+      SQLPAD_APP_LOG_LEVEL: debug
+      SQLPAD_WEB_LOG_LEVEL: warn
+      SQLPAD_SEED_DATA_PATH: /etc/sqlpad/seed-data
+    depends_on:
+      yugabyted-1:
         condition: service_healthy
