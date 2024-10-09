@@ -117,8 +117,8 @@ function node-start(){
     sudo ifconfig lo0 alias $iface &> /dev/null
   fi
 
-  master_flags="flagfile=$PROJECT_DIR/master.gflags"
-  tserver_flags="flagfile=$PROJECT_DIR/tserver.gflags"
+  master_flags="flagfile=$PROJECT_DIR/demo.master.gflags"
+  tserver_flags="flagfile=$PROJECT_DIR/demo.tserver.gflags"
 
   other_args=""
   im3=0
@@ -133,7 +133,7 @@ function node-start(){
   yugabyted start \
     --base_dir $base_dir \
     --enable_pg_parity_tech_preview  \
-    --cloud_location "demo.$region.$zone" \
+    --cloud_location "demo.local.$zone" \
     --advertise_address $iface  \
     --master_flags="$master_flags" \
     --tserver_flags="$tserver_flags" \
