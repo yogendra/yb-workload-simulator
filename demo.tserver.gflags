@@ -1,0 +1,2 @@
+--ysql_max_connections=500
+--follower_unavailable_considered_failed_sec=10
