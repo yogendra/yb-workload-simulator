@@ -1,0 +1,10 @@
+{
+  "id": "yugabyted-2",
+  "name": "YBDB N2",
+  "driver": "postgres",
+  "host": "yugabyted-2.local",
+  "port": "5433",
+  "database": "yugabyte",
+  "username": "yugabyte",
+  "password": "yugabyte"
+}

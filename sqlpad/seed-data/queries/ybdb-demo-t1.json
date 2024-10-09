@@ -1,0 +1,13 @@
+{
+  "id": "demo-t1",
+  "name": "YugabtyeDB Demo - t1 table",
+  "connectionId": "yugabyted-1",
+  "queryText": "CREATE TABLE t1(id int primary key, info text);\n\n\nSELECT count(id), max(id) from t1;\n\n\nINSERT INTO t1(id, info) select generate_series, 'INFO ' || generate_series from generate_series(1,100);\n\n\nINSERT INTO t1(id, info) select generate_series, 'INFO ' || generate_series from generate_series(101,200);\n\n\nINSERT INTO t1(id, info) select generate_series, 'INFO ' || generate_series from generate_series(201,300);\n\n\nINSERT INTO t1(id, info) select generate_series, 'INFO ' || generate_series from generate_series(301,300);\n\n\n",
+  "createdBy": "admin",
+  "acl": [
+    {
+      "groupId": "__EVERYONE__",
+      "write": true
+    }
+  ]
+}
